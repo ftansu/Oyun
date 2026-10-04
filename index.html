@@ -154,11 +154,23 @@ body.touch .icons.ctl-pc{display:none}
 #arrow.near span{color:#ffe45c;font-size:120px}
 @keyframes nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(18px)}}
 #warnText{font-size:54px}
-#stageSel{display:none;gap:22px}
-#stageSel.show{display:flex}
-#title.sel #btnStart{display:none}
-.btn.stage{display:flex;flex-direction:column;align-items:center;font-size:44px;padding:8px 38px 10px;line-height:1.05}
-.btn.stage small{font-size:17px;margin-top:2px}
+#stageSel{display:none;gap:22px;margin-top:4px}
+#title.sel #stageSel{display:flex}
+#title.sel #btnStart,#title.sel p{display:none}
+.stage{position:relative;width:150px;padding:12px 8px 12px;border-radius:26px;border:4px solid #fff3b0;background:linear-gradient(#ffe066,#f5a21b);color:#4a2500;font-family:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:0 7px 0 #a5620a,0 12px 30px rgba(0,0,0,.5);transition:transform .12s}
+.stage:hover{transform:translateY(-3px) scale(1.03)}
+.stage:active{transform:translateY(4px)}
+.stage .pic{font-size:62px;line-height:1.1}
+.stage b{font-size:30px;line-height:1}
+.stage small{font-size:19px;font-weight:bold}
+.stage.next{animation:bounce .9s ease-in-out infinite}
+.stage.locked{background:linear-gradient(#9aa0aa,#6c7280);border-color:#c9ccd2;color:#2b2f36;box-shadow:0 7px 0 #454a54,0 12px 30px rgba(0,0,0,.5)}
+.stage.locked .pic{filter:grayscale(1) brightness(.75);opacity:.55}
+.stage.locked::after{content:"🔒";position:absolute;left:50%;top:29%;transform:translate(-50%,-50%);font-size:52px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.6))}
+.stage.done::before{content:"⭐";position:absolute;right:-12px;top:-14px;font-size:34px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+.stage.soon::after{content:"Yakında";position:absolute;left:50%;top:-14px;transform:translateX(-50%);background:#2b6cb0;color:#fff;font-size:14px;font-weight:bold;padding:3px 10px;border-radius:12px;white-space:nowrap}
+.stage.shake{animation:shake .45s}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-7px)}80%{transform:translateX(7px)}}
 .row{display:flex;gap:16px;align-items:center;justify-content:center}
 .btn.ghost{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.6);box-shadow:none}
 #caught .card h2{font-size:64px;margin:0}
@@ -172,7 +184,10 @@ body.touch .icons.ctl-pc{display:none}
   .icons{font-size:30px;gap:18px;margin:2px 0 10px}
   #arrow span{font-size:64px}#arrow.near span{font-size:80px}
   #warnText{font-size:38px}
-  .btn.stage{font-size:30px;padding:6px 24px 8px}
+  .stage{width:118px;padding:8px 6px 8px;border-radius:20px}
+  .stage .pic{font-size:42px}.stage b{font-size:22px}.stage small{font-size:15px}
+  .stage.locked::after{font-size:38px}.stage.done::before{font-size:26px}
+  #stageSel{gap:16px}
   #caught .card h2{font-size:44px}
 }
 /* ---- 2. AŞAMA: ORMAN KOŞUSU ---- */
@@ -223,7 +238,11 @@ body.s2 #replay{top:calc(12px + env(safe-area-inset-top,0px))}
   <h1>DENİZ <span>&amp;</span> LİMON</h1>
   <p>Bir macera seni bekliyor...</p>
   <button id="btnStart" class="btn" type="button">▶ OYNA</button>
-  <div id="stageSel"><button id="btnS1" class="btn stage" type="button">1<small>Mağara</small></button><button id="btnS2" class="btn stage" type="button">2<small>Orman</small></button></div>
+  <div id="stageSel">
+    <button id="btnS1" class="stage" type="button" aria-label="1. Aşama: Mağara"><span class="pic">🐻</span><b>1</b><small>Mağara</small></button>
+    <button id="btnS2" class="stage" type="button" aria-label="2. Aşama: Orman"><span class="pic">🌳</span><b>2</b><small>Orman</small></button>
+    <button id="btnS3" class="stage" type="button" aria-label="3. Aşama: Deniz"><span class="pic">⛵</span><b>3</b><small>Deniz</small></button>
+  </div>
 </div>
 
 <div id="caption"></div>
@@ -1604,7 +1623,7 @@ window.addEventListener('keydown',function(e){
   if((e.code==='Space'||e.code==='Enter')){
     if(forest.phase==='dialog'&&game.state==='forest'){e.preventDefault();dialogNext();}
     else if(game.state==='forest'&&forest.phase==='atCave'){e.preventDefault();enterCave();}
-    else if(game.state==='title'){e.preventDefault();startGame();}
+    else if(game.state==='title'){e.preventDefault();if(el('title').classList.contains('sel'))pickStage(Math.min(SAVE.stage,2));else openStageSel();}
   }
 });
 window.addEventListener('keyup',function(e){var k=KEYMAP[e.code]||KEYMAP[e.key];if(k){keys[k]=false;e.preventDefault();}});
@@ -1656,9 +1675,38 @@ function goFullscreen(){
 // =====================================================================
 // FLOW (başla -> orman -> mağara -> final)
 // =====================================================================
+// ---- AŞAMA SEÇİMİ (OYNA'ya basınca sorulur; geçilmemiş aşamalar kilitli)
+var STAGE3_READY=false;
+function stageCards(){
+  var st=SAVE.stage;
+  [1,2,3].forEach(function(n){var b=el('btnS'+n);if(!b)return;
+    var open=n<=st,done=n<st,soon=n===3&&open&&!STAGE3_READY;
+    b.classList.toggle('locked',!open);b.classList.toggle('done',done);b.classList.toggle('soon',soon);
+    b.classList.toggle('next',open&&!done&&!soon);});
+}
+function openStageSel(){
+  if(game.state!=='title'||el('title').classList.contains('sel'))return;
+  goFullscreen();Voice.unlock();AudioSys.init();AudioSys.resume();AudioSys.click();
+  stageCards();el('title').classList.add('sel');show('replay',true);
+  var tap=IS_TOUCH?'dokun':'tıkla';Voice.say(SAVE.stage>=2?'Hangi maceradan başlamak istersin? Bir resme '+tap+'!':'Macera başlıyor! Mağara resmine '+tap+'!',{who:'limon',prio:3});
+}
+function lockedStage(n){
+  var b=el('btnS'+n);if(b){b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');}
+  AudioSys.tone(220,0.18,'square',0.06,{to:160});
+  if(n===2)Voice.say('Orman macerası daha kilitli. Önce mağarada beni kurtarmalısın!',{who:'limon',prio:3});
+  else if(SAVE.stage<3)Voice.say('Deniz macerası daha kilitli. Önce ormanı geçmelisin!',{who:'limon',prio:3});
+  else Voice.say('Deniz macerası çok yakında! Biraz sabret Deniz.',{who:'limon',prio:3});
+}
+function pickStage(n){
+  if(game.state!=='title')return;
+  if(!el('title').classList.contains('sel')){openStageSel();return;}
+  if(n>SAVE.stage||(n===3&&!STAGE3_READY)){lockedStage(n);return;}
+  if(n===1)startGame();
+  else if(n===2){goFullscreen();Voice.unlock();AudioSys.init();AudioSys.resume();show('title',false);startStage2();}
+}
 function startGame(){
   if(game.state!=='title')return;
-  goFullscreen();Voice.unlock();
+  Voice.stop();goFullscreen();Voice.unlock();
   AudioSys.init();AudioSys.resume();AudioSys.startForest();
   show('title',false);game.state='forest';forestReset();show('replay',true);
 }
@@ -1676,12 +1724,13 @@ function enterCave(){
   requestLock();
   setTimeout(function(){fd.style.transition='opacity 1.1s';fd.style.opacity=0;},60);
 }
-el('btnStart').addEventListener('click',startGame);
+el('btnStart').addEventListener('click',openStageSel);
 el('dlgNext').addEventListener('click',function(){dialogNext();});
 el('btnEnterCave').addEventListener('click',function(e){e.preventDefault();enterCave();});
 el('btnAgain').addEventListener('click',function(){location.reload();});
-el('btnS1').addEventListener('click',startGame);
-el('btnS2').addEventListener('click',function(){if(game.state!=='title')return;goFullscreen();Voice.unlock();AudioSys.init();AudioSys.resume();show('title',false);startStage2();});
+el('btnS1').addEventListener('click',function(){pickStage(1);});
+el('btnS2').addEventListener('click',function(){pickStage(2);});
+el('btnS3').addEventListener('click',function(){pickStage(3);});
 el('btnNext').addEventListener('click',function(){Voice.unlock();AudioSys.init();AudioSys.resume();startStage2();});
 el('s2touch').addEventListener('pointerdown',function(e){e.preventDefault();if(game.state!=='stage2')return;var x=e.clientX;if(x<SW*0.42)s2Lane(-1);else if(x>SW*0.58)s2Lane(1);},{passive:false});
 el('btnMenu').addEventListener('click',function(){location.reload();});
@@ -2673,7 +2722,7 @@ try{
   drawTitleBird();updateHideIcons();
   Voice.init();
   (function(){var p=el('subIcon').getContext('2d');p.save();p.translate(120,0);p.scale(-1,1);p.drawImage(LIMON[0],0,0);p.restore();})();
-  if(SAVE.stage>=2){el('title').classList.add('sel');show('stageSel',true);}
+  stageCards();
   player.y=CYA[4];
 }catch(e){logErr(e);}
 requestAnimationFrame(frame);
@@ -2682,7 +2731,7 @@ requestAnimationFrame(frame);
 try{if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){navigator.serviceWorker.register('sw.js').catch(function(){});}}catch(e){}
 
 // test / hata ayıklama erişimi
-window.__DL={S2EV:S2EVENTS,s2Jump:function(z){var S=S2;S.deniz.act=null;S.homeZ=null;S.enc=null;S.need=null;S.run=true;S.pz=z;S.items={fener:true,axe:true,scissors:true,honey:true,shield:true};S.evI=0;while(S.evI<S2EVENTS.length&&S2EVENTS[S.evI].z<z)S.evI++;S.pickups.forEach(function(p){if(p.z<z)p.got=true;});S.obst.forEach(function(o){if(o.z<z)o.hit=true;});},get S2(){return S2;},startStage2:startStage2,s2Use:s2Use,s2Lane:s2Lane,Voice:Voice,SAVE:SAVE,TOUCH:TOUCH,IS_TOUCH:IS_TOUCH,AudioSys:AudioSys,mem:function(){return performance.memory?performance.memory.usedJSHeapSize:0;},stepSim:function(n,dt){dt=dt||1/60;for(var i=0;i<n;i++){if(game.state==='cave')updateCave(dt);else if(game.state==='finale'||game.state==='win'){game.time+=dt;updateFinale(dt);}else if(game.state==='stage2')s2Update(dt);for(var k in pressed)pressed[k]=false;}},PROF:PROF,game:game,player:player,BEAR:BEAR,HIDE:HIDE,ENC:ENC,ROCKS:ROCKS,keys:keys,pressed:pressed,FIN:FIN,CAGE:CAGE,forest:forest,startGame:startGame,enterCave:enterCave,dialogNext:dialogNext,cam:cam,get ENCS(){return ENC;}};
+window.__DL={openStageSel:openStageSel,pickStage:pickStage,S2EV:S2EVENTS,s2Jump:function(z){var S=S2;S.deniz.act=null;S.homeZ=null;S.enc=null;S.need=null;S.run=true;S.pz=z;S.items={fener:true,axe:true,scissors:true,honey:true,shield:true};S.evI=0;while(S.evI<S2EVENTS.length&&S2EVENTS[S.evI].z<z)S.evI++;S.pickups.forEach(function(p){if(p.z<z)p.got=true;});S.obst.forEach(function(o){if(o.z<z)o.hit=true;});},get S2(){return S2;},startStage2:startStage2,s2Use:s2Use,s2Lane:s2Lane,Voice:Voice,SAVE:SAVE,TOUCH:TOUCH,IS_TOUCH:IS_TOUCH,AudioSys:AudioSys,mem:function(){return performance.memory?performance.memory.usedJSHeapSize:0;},stepSim:function(n,dt){dt=dt||1/60;for(var i=0;i<n;i++){if(game.state==='cave')updateCave(dt);else if(game.state==='finale'||game.state==='win'){game.time+=dt;updateFinale(dt);}else if(game.state==='stage2')s2Update(dt);for(var k in pressed)pressed[k]=false;}},PROF:PROF,game:game,player:player,BEAR:BEAR,HIDE:HIDE,ENC:ENC,ROCKS:ROCKS,keys:keys,pressed:pressed,FIN:FIN,CAGE:CAGE,forest:forest,startGame:startGame,enterCave:enterCave,dialogNext:dialogNext,cam:cam,get ENCS(){return ENC;}};
 })();
 </script>
 </body>

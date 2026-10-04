@@ -264,7 +264,7 @@ body.s2 #replay{top:calc(12px + env(safe-area-inset-top,0px))}
 </div>
 
 <div id="hud">
-  <div id="hudTL" class="pill">🪨<span id="hideIcons"></span><b id="hideNum" hidden>0 / 7</b></div>
+  <div id="hudTL" class="pill">🪨<span id="hideIcons"></span><b id="hideNum" hidden>0 / 4</b></div>
   <div id="hudTR" class="pill" id2="flashPill"><span id="flashTxt">🔦</span> <small style="opacity:.7">(F)</small></div>
   <div id="crosshair"></div>
   <div id="sectionLabel"></div>
@@ -807,7 +807,8 @@ function cyF(x){return 26+4.2*Math.sin(x*0.031)+1.8*Math.sin(x*0.079+1.3);}
 function cyAt(x){return CYA[clamp(Math.floor(x),0,MAP_W-1)];}
 function corridorAngle(x){var a=cyAt(x+4)-cyAt(x);return Math.atan2(a,4);}
 
-var HIDE_X=[24,62,106,154,206,252,282],HIDE_SIDE=[1,-1,1,-1,1,-1,1];
+// 4 saklanma: Giriş, Geniş Mağara, Karanlık Bölüm, Büyük Mağara
+var HIDE_X=[24,106,206,282],HIDE_SIDE=[1,-1,1,-1],HIDE_N=HIDE_X.length;
 var ROCKS=[]; // saklanma kayaları
 var CAGE={x:351.5,y:0},SLEEP={x:318.5,y:0};
 function cellFree(x,y){var ix=Math.floor(x),iy=Math.floor(y);if(ix<0||iy<0||ix>=MAP_W||iy>=MAP_H)return false;return GRID[iy*MAP_W+ix]===0;}
@@ -894,7 +895,7 @@ var ART={};
 function buildArt(){
   var i;
   ART.rocks=[];for(i=0;i<NSEC;i++){var arr=[];for(var k=0;k<4;k++)arr.push(makeRock(500+i*10+k,SECTIONS[i].wall,i===0||i===6?SECTIONS[i].ws.moss:null,200,150));ART.rocks.push(arr);}
-  ART.hideRocks=[];for(i=0;i<7;i++){var sec=SECTIONS[secIdx(HIDE_X[i])];ART.hideRocks.push(makeRock(900+i,[sec.wall[0]*0.95,sec.wall[1]*0.95,sec.wall[2]*0.95],[80,125,55],220,160));}
+  ART.hideRocks=[];for(i=0;i<HIDE_N;i++){var sec=SECTIONS[secIdx(HIDE_X[i])];ART.hideRocks.push(makeRock(900+i,[sec.wall[0]*0.95,sec.wall[1]*0.95,sec.wall[2]*0.95],[80,125,55],220,160));}
   ART.stalag=[];ART.stalac=[];for(i=0;i<NSEC;i++){ART.stalag.push([makeStalag(600+i,SECTIONS[i].wall,60,200,false),makeStalag(620+i,SECTIONS[i].wall,70,170,false)]);ART.stalac.push([makeStalag(640+i,SECTIONS[i].ceil.map(function(v){return v*1.15;}),50,190,true),makeStalag(660+i,SECTIONS[i].ceil.map(function(v){return v*1.15;}),70,150,true)]);}
   ART.crystalP=[makeCrystal(701,[150,80,230],160,180),makeCrystal(702,[170,90,240],140,200)];
   ART.crystalC=[makeCrystal(711,[60,190,230],160,180),makeCrystal(712,[70,210,220],150,160)];
@@ -986,7 +987,7 @@ function buildDecor(){
 // =====================================================================
 var game={state:'title',time:0,paused:false,wasLocked:false,hideCount:0,ei:0,exposure:0,caught:null,msgT:0,msgText:'',lastSec:-1,sleepMsgT:0,sleepTimer:-1,flashOn:true,nudgeT:0,introT:0,goodT:0,fps:60,slowT:0,quietGrowlT:12,dripT:2,stepT:0,heartT:0,chirpT:3,snoreT:2};
 var ENC=[];
-function resetEncounters(){ENC=[];for(var i=0;i<7;i++)ENC.push({rock:null,active:false,done:false});for(i=0;i<7;i++)ENC[i].rock=ROCKS[i];}
+function resetEncounters(){ENC=[];for(var i=0;i<HIDE_N;i++)ENC.push({rock:null,active:false,done:false});for(i=0;i<HIDE_N;i++)ENC[i].rock=ROCKS[i];}
 
 // =====================================================================
 // PLAYER
@@ -1248,7 +1249,7 @@ function updateBear(dt){
       break;
     case 'QUIET':
       BEAR.vx=0;BEAR.vy=0;
-      if(game.ei<7){game.quietGrowlT-=dt;if(game.quietGrowlT<=0){game.quietGrowlT=16+Math.random()*12;AudioSys.growl(0.07,1.6);}}
+      if(game.ei<HIDE_N){game.quietGrowlT-=dt;if(game.quietGrowlT<=0){game.quietGrowlT=16+Math.random()*12;AudioSys.growl(0.07,1.6);}}
       break;
     case 'SLEEPING':
       BEAR.vx=0;BEAR.vy=0;break;
@@ -1266,10 +1267,10 @@ function encounterComplete(){
   var enc=ENC[game.ei];if(!enc)return;
   enc.done=true;enc.active=false;game.hideCount++;game.ei++;updateHideIcons();
   AudioSys.sparkle();
-  if(game.hideCount>=7){game.sleepTimer=1.2;}
+  if(game.hideCount>=HIDE_N){game.sleepTimer=1.2;}
 }
 function updateEncounters(dt){
-  if(game.ei<7){var enc=ENC[game.ei];if(!enc.active&&!enc.done&&player.x>enc.rock.x-8&&BEAR.state==='QUIET')startEncounter(game.ei);}
+  if(game.ei<HIDE_N){var enc=ENC[game.ei];if(!enc.active&&!enc.done&&player.x>enc.rock.x-8&&BEAR.state==='QUIET')startEncounter(game.ei);}
   if(game.sleepTimer>0){game.sleepTimer-=dt;if(game.sleepTimer<=0){game.sleepTimer=-1;BEAR.state='SLEEPING';BEAR.x=SLEEP.x;BEAR.y=SLEEP.y;BEAR.visible=true;BEAR.alpha=1;game.sleepMsgT=7;COLLIDERS.push({x:SLEEP.x,y:SLEEP.y,r:1.25});}}
 }
 function hasLOS(ax,ay,bx,by){var d=dist2(ax,ay,bx,by),n=Math.ceil(d/0.3);for(var i=1;i<n;i++){var t=i/n;if(!cellFree(lerp(ax,bx,t),lerp(ay,by,t)))return false;}return true;}
@@ -1300,7 +1301,7 @@ function updateCaught(dt){
 // =====================================================================
 var HIDE={active:false,phase:'',t:0,rock:null,fromCam:null,toCam:null,dFrom:null,dTo:null,deniz:{x:0,y:0},crouch:true};
 function tryHide(iv){
-  if(game.ei>=7)return false;var enc=ENC[game.ei];if(!enc||!enc.active||enc.done)return false;
+  if(game.ei>=HIDE_N)return false;var enc=ENC[game.ei];if(!enc||!enc.active||enc.done)return false;
   if(BEAR.state==='HIDDEN'||BEAR.state==='QUIET')return false;
   var r=enc.rock,d=dist2(player.x,player.y,r.x,r.y);if(d>2.9)return false;
   var len=Math.sqrt(iv.x*iv.x+iv.y*iv.y);if(len<0.01)return false;
@@ -1577,7 +1578,7 @@ function renderForest(dt,dark){
 // =====================================================================
 function el(id){return document.getElementById(id);}
 function show(id,on){var e=el(id);if(!e)return;if(on)e.classList.add('show');else e.classList.remove('show');}
-function updateHideIcons(){var h=el('hideIcons');if(!h.children.length){for(var i=0;i<7;i++){var s=document.createElement('i');h.appendChild(s);}}for(var j=0;j<7;j++)h.children[j].className=j<game.hideCount?'on':'';el('hideNum').textContent=game.hideCount+' / 7';}
+function updateHideIcons(){var h=el('hideIcons');if(!h.children.length){for(var i=0;i<HIDE_N;i++){var s=document.createElement('i');h.appendChild(s);}}for(var j=0;j<HIDE_N;j++)h.children[j].className=j<game.hideCount?'on':'';el('hideNum').textContent=game.hideCount+' / '+HIDE_N;}
 function keyLabel(side){return side>0?'→':'←';}
 function pushHint(side){return IS_TOUCH?"joystick'i <b>"+(side>0?'sağa →':'sola ←')+"</b> it":"<b>"+keyLabel(side)+"</b> tuşuna bas";}
 function setMsg(t){}
@@ -1605,7 +1606,7 @@ function updateHUD(dt){
     else if(game.nudgeT>0)vsay('wait'+HIDE.rock.i+'_'+Math.floor(game.time/3),'Bekle! Ayı hâlâ yakında.',1);
     else if(HIDE.phase==='hidden')vsay('hid'+HIDE.rock.i,'Şşş... Çok iyi saklandın. Ayı gidene kadar bekle.',2);
   }else if(game.sleepMsgT>0)vsay('sleep','Bak! Ayı çok yoruldu ve uyudu. Şşş... Sessizce yanından geç ve beni bul.',3);
-  else if(game.goodT>0&&game.hideCount<7)vsay('good'+game.hideCount,GOOD[game.hideCount%GOOD.length],1);
+  else if(game.goodT>0&&game.hideCount<HIDE_N)vsay('good'+game.hideCount,GOOD[game.hideCount%GOOD.length],1);
   else if(game.state==='cave'&&player.x>322)vsay('cage','Deniz! Buradayım! Işığa doğru gel!',2);
   var si=secIdx(player.x);if(si!==game.lastSec){game.lastSec=si;var sl=el('sectionLabel');sl.textContent=SECTIONS[si].name;sl.style.opacity=1;clearTimeout(sl._to);sl._to=setTimeout(function(){sl.style.opacity=0;},2800);}
 }
